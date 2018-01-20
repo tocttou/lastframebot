@@ -1,0 +1,60 @@
+buildscript {
+    ext.kotlin_version = '1.2.20'
+    ext.jrawVersion = '517837c'
+
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        classpath 'org.junit.platform:junit-platform-gradle-plugin:1.0.0'
+    }
+}
+
+version '1.0-SNAPSHOT'
+
+apply plugin: 'kotlin'
+apply plugin: 'org.junit.platform.gradle.plugin'
+apply plugin: 'application'
+
+mainClassName = 'in.ashishchaudhary.lastframebot.Bot'
+
+junitPlatform {
+    filters {
+        engines {
+            include 'spek'
+        }
+    }
+}
+
+repositories {
+    maven { url "http://dl.bintray.com/jetbrains/spek" }
+    jcenter()
+    maven { url 'https://jitpack.io' }
+    mavenCentral()
+}
+
+defaultTasks 'run'
+
+dependencies {
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
+    compile "com.github.mattbdean:JRAW:$jrawVersion"
+    compile 'io.sentry:sentry-log4j2:1.6.4'
+    compile "org.slf4j:slf4j-simple:1.7.9"
+    testCompile "org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version"
+    testCompile "org.jetbrains.kotlin:kotlin-reflect:$kotlin_version"
+    testCompile('org.jetbrains.spek:spek-api:1.1.5') {
+        exclude group: 'org.jetbrains.kotlin'
+    }
+    testRuntime('org.jetbrains.spek:spek-junit-platform-engine:1.1.5') {
+        exclude group: 'org.junit.platform'
+        exclude group: 'org.jetbrains.kotlin'
+    }
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
