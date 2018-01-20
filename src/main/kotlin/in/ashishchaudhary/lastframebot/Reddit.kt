@@ -1,5 +1,15 @@
 package `in`.ashishchaudhary.lastframebot
 
+import `in`.ashishchaudhary.lastframebot.resources.Gfycat.getGiantMP4FromSlug
+import `in`.ashishchaudhary.lastframebot.resources.Gfycat.gfycatDomainRegex
+import `in`.ashishchaudhary.lastframebot.resources.Gfycat.gfycatGiantRegex
+import `in`.ashishchaudhary.lastframebot.resources.Gfycat.gfycatGifsDetailRegex
+import `in`.ashishchaudhary.lastframebot.resources.Gfycat.gfycatNoPrefixRegex
+import `in`.ashishchaudhary.lastframebot.resources.Imgur.imgurDomainRegex
+import `in`.ashishchaudhary.lastframebot.resources.Imgur.imgurFileRegex
+import `in`.ashishchaudhary.lastframebot.resources.Imgur.imgurGalleryRegex
+import `in`.ashishchaudhary.lastframebot.resources.Imgur.imgurNoPrefixRegex
+import `in`.ashishchaudhary.lastframebot.resources.ResourceList
 import android.util.Patterns
 import net.dean.jraw.models.Comment
 import net.dean.jraw.models.Submission
@@ -10,11 +20,6 @@ import java.net.URL
 object Reddit {
     private val reddit = Auth.redditClient
     val logger = LogManager.getLogger("lastframebot")
-    private val imgurDomainRegex = Regex("^((i|www)\\.)?imgur.com$", RegexOption.MULTILINE)
-    private val imgurFileRegex = Regex("^/([a-zA-Z0-9]*).(gifv?|webm|mp4)$", RegexOption.MULTILINE)
-    private val imgurGalleryRegex = Regex("^/gallery([/a-zA-Z0-9]*)$", RegexOption.MULTILINE)
-    private val imgurNoPrefixRegex =
-        Regex("^/(?!gallery/)([a-zA-Z0-9]{1,})$", RegexOption.MULTILINE)
 
     fun getLatestParentChildPair(subreddit: String): List<Pair<String, Comment>> {
         val comments = reddit.subreddit(subreddit).comments().limit(50).build().iterator().next()
@@ -40,15 +45,7 @@ object Reddit {
         return null
     }
 
-    sealed class Resource {
-        data class ImgurGif(val url: URL) : Resource()
-        data class ImgurGifv(val url: URL) : Resource()
-        data class ImgurMP4(val url: URL) : Resource()
-        data class ImgurWebm(val url: URL) : Resource()
-        data class ImgurUnknown(val url: URL) : Resource()
-    }
-
-    fun transformURLToResource(url: URL): Resource? {
+    fun transformURLToResource(url: URL): ResourceList? {
         return when {
             imgurDomainRegex.matches(url.host) -> {
                 val path = url.path.trimEnd('/')
@@ -59,10 +56,10 @@ object Reddit {
                         val id = groupValues[groupValues.size - 2]
                         val downloadURL = "https://imgur.com/download/$id"
                         when (extension) {
-                            "gif" -> Resource.ImgurGif(URL(downloadURL))
-                            "gifv" -> Resource.ImgurGifv(URL(downloadURL))
-                            "webm" -> Resource.ImgurWebm(URL(downloadURL))
-                            else -> Resource.ImgurMP4(URL(downloadURL))
+                            "gif" -> ResourceList.ImgurGif(URL(downloadURL))
+                            "gifv" -> ResourceList.ImgurGifv(URL(downloadURL))
+                            "webm" -> ResourceList.ImgurWebm(URL(downloadURL))
+                            else -> ResourceList.ImgurMP4(URL(downloadURL)) // mp4
                         }
                     }
                     imgurGalleryRegex.matches(path) -> null
@@ -70,10 +67,33 @@ object Reddit {
                         val groupValues = imgurNoPrefixRegex.find(path)!!.groupValues
                         val id = groupValues.last()
                         val downloadURL = "https://imgur.com/download/$id"
-                        Resource.ImgurUnknown(URL(downloadURL))
+                        ResourceList.ImgurUnknown(URL(downloadURL))
                     }
                     else -> {
                         logger.info("No value matched any Imgur regex for url - $url")
+                        null
+                    }
+                }
+            }
+            gfycatDomainRegex.matches(url.host) -> {
+                val path = url.path.trimEnd('/')
+                return when {
+                    gfycatGiantRegex.matches(path) -> {
+                        when (gfycatGiantRegex.find(path)!!.groupValues.last()) {
+                            "webm" -> ResourceList.GfycatWebm(url)
+                            else -> ResourceList.GfycatMP4(url) //mp4
+                        }
+                    }
+                    gfycatNoPrefixRegex.matches(path) -> {
+                        val slug = gfycatNoPrefixRegex.find(path)!!.groupValues.last()
+                        ResourceList.GfycatMP4(URL(getGiantMP4FromSlug(slug)))
+                    }
+                    gfycatGifsDetailRegex.matches(path) -> {
+                        val slug = gfycatNoPrefixRegex.find(path)!!.groupValues.last()
+                        ResourceList.GfycatMP4(URL(getGiantMP4FromSlug(slug)))
+                    }
+                    else -> {
+                        logger.info("No value matched any Gfycat regex for url - $url")
                         null
                     }
                 }
